@@ -42,6 +42,7 @@ typedef struct sparse_header {
 #define CHUNK_TYPE_FILL		0xCAC2
 #define CHUNK_TYPE_DONT_CARE	0xCAC3
 #define CHUNK_TYPE_CRC32    0xCAC4
+#define CHUNK_TYPE_LZ4    0xCAC5
 
 typedef struct chunk_header {
   __le16	chunk_type;	/* 0xCAC1 -> raw; 0xCAC2 -> fill; 0xCAC3 -> don't care */

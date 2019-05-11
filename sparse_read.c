@@ -29,6 +29,7 @@
 #include <unistd.h>
 
 #include <sparse/sparse.h>
+#include <lz4.h>
 
 #include "defs.h"
 #include "output_file.h"
@@ -132,6 +133,76 @@ static int process_raw_chunk(struct sparse_file *s, unsigned int chunk_size,
         lseek64(fd, len, SEEK_CUR);
     }
 
+    return 0;
+}
+
+
+/*! LZ4_decompress_safe() :
+    compressedSize : is the exact complete size of the compressed block.
+    dstCapacity : is the size of destination buffer, which must be already allocated.
+    return : the number of bytes decompressed into destination buffer (necessarily <= dstCapacity)
+             If destination buffer is not large enough, decoding will stop and output an error code (negative value).
+             If the source stream is detected malformed, the function will stop decoding and return a negative result.
+             This function is protected against malicious data packets.
+*/
+//LZ4LIB_API int LZ4_decompress_safe (const char* src, char* dst, int compressedSize, int dstCapacity);
+
+static int process_lz4_chunk(struct sparse_file *s, unsigned int chunk_size,
+                             int fd, int64_t offset, unsigned int blocks, unsigned int block,
+                             uint32_t * crc32)
+{
+    int ret;
+    int chunk;
+    char *tmp_buff;
+    char *lz4_tmp_buff;
+    unsigned int len = blocks * s->block_size;
+
+    tmp_buff = malloc(chunk_size);
+    if (tmp_buff == NULL)
+        return -ENOMEM;
+    lz4_tmp_buff = malloc(len);
+    if (lz4_tmp_buff == NULL) {
+        free(tmp_buff);
+        return -ENOMEM;
+    }
+    ret = read_all(fd, tmp_buff, chunk_size);
+    if (ret < 0) {
+        free(tmp_buff);
+        free(lz4_tmp_buff);
+        return ret;
+    }
+
+    ret = LZ4_decompress_safe(tmp_buff, lz4_tmp_buff, chunk_size, len);
+    if (ret < 0) {
+        free(tmp_buff);
+        free(lz4_tmp_buff);
+        return -EFAULT;
+    }
+    chunk_size = ret;
+
+    if (chunk_size % s->block_size != 0) {
+        free(tmp_buff);
+        free(lz4_tmp_buff);
+        return -EINVAL;
+    }
+
+    if (chunk_size / s->block_size != blocks) {
+        free(tmp_buff);
+        free(lz4_tmp_buff);
+        return -EINVAL;
+    }
+
+    ret = sparse_file_add_data(s, lz4_tmp_buff, chunk_size, block);
+    if (ret < 0) {
+        free(tmp_buff);
+        free(lz4_tmp_buff);
+        return ret;
+    }
+
+    if (crc32)
+        *crc32 = sparse_crc32(*crc32, lz4_tmp_buff, chunk_size);
+
+    free(tmp_buff);
     return 0;
 }
 
@@ -262,6 +333,14 @@ static int process_chunk(struct sparse_file *s, int fd, off64_t offset,
             return ret;
         }
         return 0;
+    case CHUNK_TYPE_LZ4:
+        ret = process_lz4_chunk(s, chunk_data_size, fd, offset,
+                                chunk_header->chunk_sz, cur_block, crc_ptr);
+        if (ret < 0) {
+            verbose_error(s->verbose, ret, "lz4 data block at %" PRId64, offset);
+            return ret;
+        }
+        return chunk_header->chunk_sz;
     default:
         verbose_error(s->verbose, -EINVAL, "unknown block %04X at %" PRId64,
                       chunk_header->chunk_type, offset);

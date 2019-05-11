@@ -21,7 +21,7 @@ DEP_CC  ?= gcc
 AR      ?= ar
 RANLIB  ?= ranlib
 STRIP   ?= strip
-CFLAGS  += -O2 -Wall -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE=1
+CFLAGS  += -O0 -ggdb -Wall -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE=1
 
 # libsparse
 LIB_NAME = sparse
@@ -36,7 +36,7 @@ LIB_SRCS = \
 LIB_OBJS = $(LIB_SRCS:%.c=%.o)
 LIB_INCS = -Iinclude
 
-LDFLAGS += -L. -l$(LIB_NAME) -lm -lz
+LDFLAGS += -L. -l$(LIB_NAME) -lm -lz -llz4
 
 BINS = simg2img simg2simg img2simg append2simg
 HEADERS = include/sparse/sparse.h
@@ -67,7 +67,7 @@ SRCS = \
 .PHONY: default all clean install
 
 default: all
-all: $(LIB_NAME) simg2img simg2simg img2simg append2simg
+all: $(LIB_NAME) simg2img simg2simg img2simg append2simg sinunpack
 
 install: all
 	install -d $(PREFIX)/bin $(PREFIX)/lib $(PREFIX)/include/sparse
@@ -81,6 +81,9 @@ $(LIB_NAME): $(LIB_OBJS)
 
 simg2img: $(SIMG2IMG_SRCS) $(LIB_NAME)
 		$(CC) $(CFLAGS) $(LIB_INCS) -o simg2img $< $(LDFLAGS)
+
+sinunpack: sinunpack.c $(LIB_NAME)
+		$(CC) $(CFLAGS) $(LIB_INCS) -o sinunpack $< $(LDFLAGS)
 
 simg2simg: $(SIMG2SIMG_SRCS) $(LIB_NAME)
 		$(CC) $(CFLAGS) $(LIB_INCS) -o simg2simg $< $(LDFLAGS)
