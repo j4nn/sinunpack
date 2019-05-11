@@ -856,7 +856,7 @@ int main(int argc, char *argv[])
 	FILE *fi = NULL;
 	int fld_cbck;
 	char fld[256];
-	char file_format[3];
+	char file_format[320];
 	char sinfil[256];
 	char *progname = basenamee(argv[0]);
 	unsigned short VID = 0x0FCE;
@@ -969,7 +969,7 @@ int main(int argc, char *argv[])
 								goto getoutofflashing;
 							}
 							fseeko64(fi, 0, SEEK_SET);
-							fread_unus_res(file_format, 1, 2, fi);
+							fread_unus_res(file_format, 1, sizeof(file_format), fi);
 							if (fi) fclose(fi);
 
 							if (memcmp(file_format, "\x1F\x8B", 2) == 0)
@@ -1004,6 +1004,25 @@ int main(int argc, char *argv[])
 								}
 
 								remove(fld);
+							}
+							else if (memcmp(file_format+0x101, "\x75\x73\x74\x61", 4) == 0)
+							{
+								FILE *a = NULL;
+								a = fopen64(sinfil, "rb");
+								if (a == NULL)
+								{
+									printf(" - Unable to open %s\n", sinfil);
+								}
+								else
+								{
+									if (!process_sins(a, sinfil, "unpacked", "flash"))
+									{
+										fclose(a);
+										closedir(dir);
+										goto getoutofflashing;
+									}
+									fclose(a);
+								}
 							}
 							else
 							{
