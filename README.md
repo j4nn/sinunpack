@@ -1,3 +1,10 @@
+Forked from https://github.com/anestisb/android-simg2img.git
+for implementing sinunpack tool, which is based on https://github.com/newflasher/newflasher.git
+Thanks to authors of both projects!
+
+
+
+
 simg2img
 =========
 
